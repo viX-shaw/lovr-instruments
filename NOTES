@@ -1,0 +1,11 @@
+For the Piano
+
+1) Need hinged physics colliders
+2) On a 2x4x2 inch cuboid for the keys
+3) 10 fingers collision tracking
+4) For each piano, ugen on each spork
+5) Threaded requests to server to allow independent finger collisions.
+
+
+Good to have:
+1) Believable key movement.
