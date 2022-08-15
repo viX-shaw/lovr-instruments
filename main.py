@@ -31,7 +31,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     osc_client = udp_client.SimpleUDPClient(args.ip, args.port)
-    app.run(host="127.0.0.1", port=5006, threaded=True, debug=True)
+    app.run(host="0.0.0.0", port=5006, threaded=True, debug=True)
 
 #   for x in range(10):
 #     client.send_message("/myChucK/OSCNote", random.random())
