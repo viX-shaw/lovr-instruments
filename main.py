@@ -16,10 +16,24 @@ args = None
 osc_client = None
 
 
-@app.route("/pythonOSC/<int:note>/<float:intensity>")
+@app.route("/pythonOSC/1/<int:note>/<float:intensity>")
 def sendOSC(note, intensity):
     # client.send_message("/myChucK/OSCNote", [random.randint(48, 60), 0.4, "hello"])
     osc_client.send_message("/myChucK/OSCNote", [note, intensity, "hello"])
+    print(f" Note - {note},  Intensity - {intensity}")
+    return "Sent OSC message!"
+
+@app.route("/pythonOSC/2/<int:note>/<float:intensity>")
+def sendOSC(note, intensity):
+    # client.send_message("/myChucK/OSCNote", [random.randint(48, 60), 0.4, "hello"])
+    osc_client2.send_message("/myChucK/OSCNote", [note, intensity, "hello"])
+    print(f" Note - {note},  Intensity - {intensity}")
+    return "Sent OSC message!"
+
+@app.route("/pythonOSC/3/<int:note>/<float:intensity>")
+def sendOSC(note, intensity):
+    # client.send_message("/myChucK/OSCNote", [random.randint(48, 60), 0.4, "hello"])
+    osc_client3.send_message("/myChucK/OSCNote", [note, intensity, "hello"])
     print(f" Note - {note},  Intensity - {intensity}")
     return "Sent OSC message!"
 
@@ -31,6 +45,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     osc_client = udp_client.SimpleUDPClient(args.ip, args.port)
+    osc_client = udp_client.SimpleUDPClient(args.ip, 5007)
+    osc_client = udp_client.SimpleUDPClient(args.ip, 5008)
+
     app.run(host="0.0.0.0", port=5006, threaded=True, debug=True)
 
 #   for x in range(10):

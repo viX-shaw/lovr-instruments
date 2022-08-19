@@ -11,12 +11,27 @@ local keys = {
 }
 
 local fingertipsize = 0.01
+local keysStartPos = vec3(-0.15, 1.35, -0.2) -- vec3(0.1,1.5,-0.35)
+local bKeyShape = vec3(0.01, 0.01, 0.06)
+local wKeyShape = vec3(0.02, 0.01, 0.09)
+
+local bKeyHeight = vec3(0.0, 0.01, 0.0)
+local wKeyWidth = vec3(0.02, 0.0, 0.0)
+
+local octaves = 1
 
 local scene = {}
 
+function contains(tb, key)
+  for _, en in ipairs(tb) do
+    if en == key then return 1 end
+  end
+  return 0
+end
+
 function scene.load()
   -- Setup Thread(s) to signal play
-  local channelName = 'thread1'
+  local channelName = '1'
   channel = lovr.thread.getChannel(channelName)
   thread = lovr.thread.newThread('play.lua')
   thread:start(channelName)
@@ -25,10 +40,32 @@ function scene.load()
     -- ground plane
   local box = world:newBoxCollider(vec3(0, 0, 0), vec3(20, 0.1, 20))
     -- just one lonely piano key
-  local pianokeyCollider = world:newBoxCollider(vec3(0.1,1.5,-0.35), vec3(0.02, 0.01, 0.07))
-  pianokeyCollider:setKinematic(true)
-  pianokeyCollider:setUserData(52)
-  table.insert(keys.colliders, pianokeyCollider)
+
+  local pianoKey = 48
+  for octave = 0, octaves do
+    local newPos = 0
+    for key = 1, 5 do
+      newPos = keysStartPos + vec3(0.02, 0.0, 0.0):mul(key) + vec3(0.01, 0.005, -0.01)
+      if key > 2 then
+        newPos = keysStartPos + vec3(0.02, 0.0, 0.0):mul(key+1) + vec3(0.01, 0.005, -0.01)
+      end
+      local pianokeyCollider = world:newBoxCollider(newPos, bKeyShape)
+      pianokeyCollider:setKinematic(true)
+      pianokeyCollider:setUserData(pianoKey)
+      table.insert(keys.colliders, pianokeyCollider)
+      pianoKey = pianoKey + 1
+    end
+    for key = 1, 7 do
+      newPos = keysStartPos + vec3(0.02, 0.0, 0.0):mul(key) + vec3(0.001, 0.0, 0.0)
+      local pianokeyCollider = world:newBoxCollider(newPos, wKeyShape)
+      pianokeyCollider:setKinematic(true)
+      pianokeyCollider:setUserData(pianoKey)
+      table.insert(keys.colliders, pianokeyCollider)
+      pianoKey = pianoKey + 1
+    end
+    keysStartPos = newPos
+  end
+
   --create colliders for all finger tips
   local count = 1
   for count = 1, 10 do
@@ -41,7 +78,7 @@ function scene.load()
       function (collider, world)
         -- store keys that were last touched by the fingers
         -- local colliderId = collider:getUserData()
-        if hands.touching[count] == nil or (lovr.timer.getTime() - hands.touching[count]) > 1.0 then
+        if hands.touching[count] == nil or (lovr.timer.getTime() - hands.touching[count]) > 0.5 then
           if collider:getUserData() and collider:getUserData() > 10 then   
             print("Pressing...  "..collider:getUserData())
             channel:push(collider:getUserData())
@@ -118,7 +155,7 @@ function drawCollider(collider, shapetype)
     if shapetype == 'box' then
       local size = vec3(shape:getDimensions())
       pose:scale(size)
-      lovr.graphics.box('fill', pose)
+      lovr.graphics.box('line', pose)
     end
     if shapetype == 'sphere' then
       -- lovr.graphics.sphere(vec3(pose):unpack(), fingertipsize)
