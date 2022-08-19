@@ -10,8 +10,8 @@ local keys = {
   colliders = {},
 }
 
-local fingertipsize = 0.01
-local keysStartPos = vec3(-0.15, 1.35, -0.2) -- vec3(0.1,1.5,-0.35)
+local fingertipsize = 0.006
+local keysStartPos = vec3(-0.15, 1.7, -0.35) -- vec3(0.1,1.5,-0.35)
 local bKeyShape = vec3(0.01, 0.01, 0.06)
 local wKeyShape = vec3(0.02, 0.01, 0.09)
 
@@ -20,6 +20,9 @@ local wKeyWidth = vec3(0.02, 0.0, 0.0)
 
 local octaves = 1
 
+local channelCounter = 0
+local channelNames = {'1', '2', '3'}
+local channels = {}
 local scene = {}
 
 function contains(tb, key)
@@ -29,12 +32,24 @@ function contains(tb, key)
   return 0
 end
 
-function scene.load()
+function getChannel()
+  channelCounter = channelCounter + 1
+  if channelCounter > 100 then channelCounter = 1 end
+  return channels[(channelCounter % (#channels)) + 1]
+end
+
+function setupChannels()
   -- Setup Thread(s) to signal play
-  local channelName = '1'
-  channel = lovr.thread.getChannel(channelName)
-  thread = lovr.thread.newThread('play.lua')
-  thread:start(channelName)
+  for _, channelName in ipairs(channelNames) do
+    local channel = lovr.thread.getChannel(channelName)
+    local thread = lovr.thread.newThread('play.lua')
+    thread:start(channelName)
+    table.insert(channels, channel)
+  end
+end
+
+function scene.load()
+  setupChannels()
   -- Setup complete  
   world = lovr.physics.newWorld(0, -2, 0, false)
     -- ground plane
@@ -81,7 +96,7 @@ function scene.load()
         if hands.touching[count] == nil or (lovr.timer.getTime() - hands.touching[count]) > 0.5 then
           if collider:getUserData() and collider:getUserData() > 10 then   
             print("Pressing...  "..collider:getUserData())
-            channel:push(collider:getUserData())
+            getChannel():push(collider:getUserData())
             hands.touching[count] = lovr.timer.getTime()
           end
         end
