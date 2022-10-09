@@ -1,7 +1,8 @@
 local world
 local hands = {
   colliders = {nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
-  touching = {nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
+  touching = {nil, nil, nil, nil, nil, nil, nil, nil, nil, nil},
+  touchingPrevFrame = {nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 }
 local framerate = 1 / 72 -- fixed framerate is recommended for physics updates
 local collisionCallbacks = {}
@@ -14,7 +15,7 @@ local keys = {
 local fingertipsize = 0.006
 local keysStartPos = vec3(-0.15, 1.7, -0.35) -- vec3(0.1,1.5,-0.35)
 local bKeyShape = vec3(0.01, 0.01, 0.07)
-local wKeyShape = vec3(0.03, 0.01, 0.115)
+local wKeyShape = vec3(0.03, 0.025, 0.115)
 
 local octaves = 1
 
@@ -28,7 +29,7 @@ local mode = true --also true - allowed to play, false - to move stuff around
 local wasPressed = false
 local wasReleased = false
 
-local startTime = lovr.timer.getTime()
+local lastModeCheckTime = lovr.timer.getTime()
 
 local drag = {
   active = false,
@@ -42,7 +43,7 @@ function contains(tb, key)
 end
 
 function checkMode()
-  if hands.colliders[1] ~= nil and lovr.timer.getTime() - startTime > 5.0 then
+  if hands.colliders[1] ~= nil and lovr.timer.getTime() - lastModeCheckTime > 4.0 then
     local x1, y1, z1 = hands.colliders[6]:getPosition()
     local x2, y2, z2 = hands.colliders[9]:getPosition()
 
@@ -50,6 +51,36 @@ function checkMode()
       mode = not mode
       print("Mode.."..tostring(mode))
     end
+    lastModeCheckTime = lovr.timer.getTime()
+  end
+end
+
+function checkEvents()
+  if not mode then
+    local x1, y1, z1 = hands.colliders[6]:getPosition() -- right thumb tip
+    local x2, y2, z2 = hands.colliders[7]:getPosition() -- right index tip
+    local x3, y3, z3 = hands.colliders[1]:getPosition() -- left thumb tip
+    local x4, y4, z4 = hands.colliders[5]:getPosition() -- left pinky tip
+
+    if math.abs(x4-x3)+math.abs(y4-y3)+math.abs(z4-z3) < 0.033 then
+      --Quit application
+      lovr.event.quit(0)
+    end
+
+    -- if lovr.headset.wasPressed('left','trigger') then
+    if math.abs(x2-x1)+math.abs(y2-y1)+math.abs(z2-z1) < 0.033 then
+      if not wasPressed then
+        wasPressed = true
+        print("wasPressed")
+      end
+      wasReleased = false
+    else
+      if wasPressed then
+        wasReleased = true
+      end
+      wasPressed = false
+    end
+    alternateMotion() -- only change positions when changing location of the piano
   end
 end
 
@@ -63,17 +94,15 @@ function alternateMotion()
         drag.active = true
         keys.offsets[idx]:set(offset)
       end
+      if drag.active then
+        local x, y, z = (keys.offsets[idx] + vec3(hands.colliders[6]:getPosition())):unpack()
+        coll:setPosition(x, y, z)
+      end
     end
   end
-
-  if drag.active then
-    for idx, coll in ipairs(keys.colliders) do
-      local x, y, z = (keys.offsets[idx] + vec3(hands.colliders[6]:getPosition())):unpack()
-      coll:setPosition(x, y, z)
-    end
-    if wasReleased then
-      drag.active = false
-    end
+  
+  if wasReleased then
+    drag.active = false
   end
 end
 
@@ -105,9 +134,9 @@ function scene.load()
   for octave = 0, octaves do
     local newPos = 0
     for key = 1, 5 do
-      newPos = keysStartPos + vec3(wKeyShape.x, 0.0, 0.0):mul(key) + vec3(0.01, 0.005, -0.0125)
+      newPos = keysStartPos + vec3(wKeyShape.x, 0.0, 0.0):mul(key) + vec3(wKeyShape.x / 2, 0.005, -0.0125)
       if key > 2 then
-        newPos = keysStartPos + vec3(wKeyShape.x, 0.0, 0.0):mul(key+1) + vec3(0.01, 0.005, -0.0125)
+        newPos = keysStartPos + vec3(wKeyShape.x, 0.0, 0.0):mul(key+1) + vec3(wKeyShape.x / 2, 0.005, -0.0125)
       end
       local pianokeyCollider = world:newBoxCollider(newPos, bKeyShape)
       pianokeyCollider:setKinematic(true)
@@ -140,13 +169,7 @@ function scene.load()
       function (collider, world)
         -- store keys that were last touched by the fingers
         -- local colliderId = collider:getUserData()
-        if mode and (hands.touching[count] == nil or (lovr.timer.getTime() - hands.touching[count]) > 0.5) then
-          if collider:getUserData() and collider:getUserData() > 10 then   
-            print("Pressing...  "..collider:getUserData())
-            getChannel():push(collider:getUserData())
-            hands.touching[count] = lovr.timer.getTime()
-          end
-        end
+        hands.touching[count] = collider
         -- Push note of the touching key to channel below
         -- if keys.bindings[collider] ~= nil then
         --   print("Pressing...  "..collider:getUserData())
@@ -187,26 +210,21 @@ function scene.update(dt)
     end
   end
 
-  checkMode()
-  if not mode then
-    local x1, y1, z1 = hands.colliders[6]:getPosition() -- right index tip
-    local x2, y2, z2 = hands.colliders[7]:getPosition() -- right thumb tip
-
-    -- if lovr.headset.wasPressed('left','trigger') then
-    if math.abs(x2-x1)+math.abs(y2-y1)+math.abs(z2-z1) < 0.033 then
-      if not wasPressed then
-        wasPressed = true
-        print("wasPressed")
+  if mode then
+    for idx, fingercollider in ipairs(hands.touching) do
+      if mode and fingercollider and not hands.touchingPrevFrame[idx] then
+        if fingercollider:getUserData() and fingercollider:getUserData() > 10 then   
+          print("Pressing...  "..fingercollider:getUserData())
+          getChannel():push(fingercollider:getUserData())
+        end
       end
-      wasReleased = false
-    else
-      if wasPressed then
-        wasReleased = true
-      end
-      wasPressed = false
     end
-    alternateMotion() -- only change positions when changing location of the piano
   end
+
+  checkMode()
+  checkEvents()
+  hands.touchingPrevFrame = hands.touching
+  hands.touching = {nil, nil, nil, nil, nil, nil, nil, nil, nil, nil}
 end
 
 -- Touching keys to set again in collision resolver
@@ -217,7 +235,6 @@ end
 
 function scene.draw()
   for i, collider in ipairs(hands.colliders) do
-    local alpha = hands.touching[i] and 1 or 0.8
     lovr.graphics.setColor(0.1, 0.3, 0.7)
     if not mode then
       lovr.graphics.setColor(0.1, 0.3, 0.3)
@@ -262,6 +279,12 @@ function registerCollisionCallback(collider, callback)
     collisionCallbacks[shape] = callback
   end
   -- to be called with arguments callback(otherCollider, world) from update function
+end
+
+function scene.clean()
+  world:destroy()
+  hands = {}
+  world = {}
 end
 
 return scene

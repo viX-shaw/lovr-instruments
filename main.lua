@@ -1,6 +1,8 @@
+require 'utils'
 local httpclient = require('luajit-request')
 -- local socket = require "socket"
 local scene = require('scene')
+local sTime = lovr.timer.getTime()
 
 -- function lovr.draw()
 --     lovr.timer.sleep(5)
@@ -20,4 +22,14 @@ end
 
 function lovr.update(dt)
     scene.update(dt)
+    reloadIfChanged()
 end
+
+function lovr.quit()
+    scene.clean()
+end
+
+function lovr.restart()
+    print("Restart Event received..")
+end
+
